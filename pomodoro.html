@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Pomodoro Pro</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  color: white;
+  text-align: center;
+  background: #0f172a;
+}
+
+.container {
+  margin-top: 50px;
+  background: #1e293b;
+  padding: 30px;
+  border-radius: 15px;
+  display: inline-block;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+#timer {
+  font-size: 70px;
+  margin: 20px 0;
+}
+
+button {
+  padding: 8px 15px;
+  margin: 5px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #3b82f6;
+  color: white;
+  font-weight: bold;
+}
+
+button:hover {
+  background: #2563eb;
+}
+
+input, select {
+  padding: 5px;
+  margin: 5px;
+  border-radius: 5px;
+  border: none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Pomodoro</h1>
+
+<div id="timer">25:00</div>
+
+<button onclick="startTimer()">Start</button>
+<button onclick="pauseTimer()">Pause</button>
+<button onclick="resetTimer()">Reset</button>
+
+<br><br>
+
+Trabalho: <input id="work" type="number" value="25" style="width: 50px;"> min
+<button onclick="applySettings()">Aplicar</button>
+
+<br><br>
+
+<select id="musicSelect">
+  <option value="">Sem música</option>
+
+  <optgroup label="Lofi">
+    <option value="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3">Lofi 1</option>
+    <option value="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3">Lofi 2</option>
+    <option value="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3">Lofi 3</option>
+  </optgroup>
+
+  <optgroup label="Ambiente">
+    <option value="https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg">Chuva</option>
+    <option value="https://actions.google.com/sounds/v1/water/waves_crashing_on_rock_beach.ogg">Ondas do mar</option>
+    <option value="https://actions.google.com/sounds/v1/nature/jungle_atmosphere_late_night.ogg">Floresta</option>
+    <option value="https://actions.google.com/sounds/v1/water/babbling_brook.ogg">Rio</option>
+    <option value="https://actions.google.com/sounds/v1/household/crackling_fireplace.ogg">Lareira</option>
+  </optgroup>
+
+  <optgroup label="Música Clássica">
+    <option value="https://upload.wikimedia.org/wikipedia/commons/b/bd/Vivaldi_-_Spring_mvt_1_Allegro_-_John_Harrison_violin.ogg">Vivaldi - Primavera</option>
+    <option value="https://upload.wikimedia.org/wikipedia/commons/e/e4/Beethoven_Moonlight_1st_movement.ogg">Beethoven - Moonlight Sonata</option>
+    <option value="https://upload.wikimedia.org/wikipedia/commons/e/e5/Mozart_-_Eine_kleine_Nachtmusik_-_1._Allegro.ogg">Mozart - Eine kleine Nachtmusik</option>
+    <option value="https://upload.wikimedia.org/wikipedia/commons/e/e4/Chopin_Nocturne_Op_9_No_2_E_Flat_Major.ogg">Chopin - Noturno Op. 9 No. 2</option>
+  </optgroup>
+</select>
+
+<br><br>
+
+<button onclick="playMusic()">Play</button>
+<button onclick="stopMusic()">Parar</button>
+
+<br><br>
+
+Volume:
+<input type="range" min="0" max="1" step="0.01" value="0.3" id="volumeSlider" onchange="changeVolume()">
+
+<button onclick="toggleMute()" id="muteBtn">Mute</button>
+
+</div>
+
+<audio id="music" loop></audio>
+<audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg"></audio>
+
+<script>
+let timer;
+let timeLeft = 1500;
+let running = false;
+let muted = false;
+
+// TIMER
+function updateDisplay() {
+  let min = Math.floor(timeLeft / 60);
+  let sec = timeLeft % 60;
+  document.getElementById("timer").innerText =
+    String(min).padStart(2,'0') + ":" + String(sec).padStart(2,'0');
+}
+
+function startTimer() {
+  if (running) return;
+  running = true;
+
+  timer = setInterval(() => {
+    timeLeft--;
+
+    if (timeLeft <= 0) {
+      clearInterval(timer);
+      running = false;
+      updateDisplay();
+
+      // Para a música ambiente para o alarme se destacar
+      stopMusic();
+
+      // Dispara o alarme no volume máximo (1.0)
+      let alarm = document.getElementById("alarm");
+      alarm.volume = 1.0; 
+      alarm.currentTime = 0;
+      alarm.play().catch((err) => {
+        console.log("Erro ao tocar alarme:", err);
+      });
+      
+      // Corta o alarme após ~2.5 segundos (tempo exato para 3 apitos)
+      setTimeout(() => {
+        alarm.pause();
+        alarm.currentTime = 0;
+      }, 2500);
+
+      return; 
+    }
+
+    updateDisplay();
+  }, 1000);
+}
+
+function pauseTimer() {
+  clearInterval(timer);
+  running = false;
+}
+
+function resetTimer() {
+  clearInterval(timer);
+  running = false;
+  timeLeft = document.getElementById("work").value * 60;
+  updateDisplay();
+}
+
+function applySettings() {
+  timeLeft = document.getElementById("work").value * 60;
+  updateDisplay();
+}
+
+// MUSICA
+function playMusic() {
+  let music = document.getElementById("music");
+  let selected = document.getElementById("musicSelect").value;
+
+  music.pause();
+  music.currentTime = 0;
+
+  if (!selected) return;
+
+  music.src = selected;
+  
+  // Sincroniza o volume antes de tocar
+  changeVolume();
+
+  music.play().catch(err => {
+    console.log("Erro ao tocar:", err);
+    alert("Não foi possível carregar a música. Tente outra faixa.");
+  });
+}
+
+function stopMusic() {
+  let music = document.getElementById("music");
+  music.pause();
+  music.currentTime = 0;
+}
+
+function changeVolume() {
+  let music = document.getElementById("music");
+  music.volume = document.getElementById("volumeSlider").value;
+}
+
+function toggleMute() {
+  let music = document.getElementById("music");
+  let muteBtn = document.getElementById("muteBtn");
+  muted = !muted;
+  music.muted = muted;
+  
+  if(muted) {
+      muteBtn.style.backgroundColor = "#ef4444"; // Fica vermelho se mutado
+      muteBtn.innerText = "Unmute";
+  } else {
+      muteBtn.style.backgroundColor = "#3b82f6"; // Volta pro azul original
+      muteBtn.innerText = "Mute";
+  }
+}
+
+updateDisplay();
+</script>
+
+</body>
+</html>
