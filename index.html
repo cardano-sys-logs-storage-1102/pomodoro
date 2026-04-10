@@ -2,232 +2,751 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Pomodoro Pro</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pomodoro</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  color: white;
-  text-align: center;
-  background: #0f172a;
-}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-.container {
-  margin-top: 50px;
-  background: #1e293b;
-  padding: 30px;
-  border-radius: 15px;
-  display: inline-block;
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
-}
+  body {
+    background: #0a0a0a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+  }
 
-#timer {
-  font-size: 70px;
-  margin: 20px 0;
-}
+  .card {
+    width: 220px;
+    height: 260px;
+    background: #0d0d0d;
+    border: 1px solid #1a2a1a;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
 
-button {
-  padding: 8px 15px;
-  margin: 5px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  background: #3b82f6;
-  color: white;
-  font-weight: bold;
-}
+  /* scanline overlay */
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,255,65,0.015) 2px,
+      rgba(0,255,65,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 10;
+  }
 
-button:hover {
-  background: #2563eb;
-}
+  /* corner accents */
+  .corner {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-color: #00ff41;
+    border-style: solid;
+    opacity: 0.5;
+  }
+  .corner.tl { top: 8px; left: 8px; border-width: 1px 0 0 1px; }
+  .corner.tr { top: 8px; right: 8px; border-width: 1px 1px 0 0; }
+  .corner.bl { bottom: 8px; left: 8px; border-width: 0 0 1px 1px; }
+  .corner.br { bottom: 8px; right: 8px; border-width: 0 1px 1px 0; }
 
-input, select {
-  padding: 5px;
-  margin: 5px;
-  border-radius: 5px;
-  border: none;
-}
+  /* ---- IDLE STATE ---- */
+  .idle-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    transition: opacity 0.3s;
+  }
+
+  .module-tag {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #1a4a1a;
+    text-transform: uppercase;
+  }
+
+  .idle-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 26px;
+    font-weight: 300;
+    color: #00ff41;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    opacity: 0.9;
+  }
+
+  .idle-desc {
+    font-size: 10px;
+    color: #2a4a2a;
+    text-align: center;
+    line-height: 1.6;
+    max-width: 140px;
+  }
+
+  .start-btn {
+    margin-top: 8px;
+    background: transparent;
+    border: 1px solid #00ff41;
+    color: #00ff41;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    padding: 6px 20px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    text-transform: uppercase;
+  }
+  .start-btn:hover {
+    background: #00ff41;
+    color: #000;
+  }
+
+  /* ---- ACTIVE STATE ---- */
+  .active-view {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 16px 12px 12px;
+    position: relative;
+  }
+
+  /* SVG ring */
+  .ring-wrap {
+    position: relative;
+    width: 130px;
+    height: 130px;
+    flex-shrink: 0;
+  }
+
+  .ring-svg {
+    width: 130px;
+    height: 130px;
+    transform: rotate(-90deg);
+  }
+
+  .ring-track {
+    fill: none;
+    stroke: #0d1f0d;
+    stroke-width: 5;
+  }
+
+  .ring-progress {
+    fill: none;
+    stroke: #00ff41;
+    stroke-width: 5;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear, stroke 0.5s;
+    filter: drop-shadow(0 0 4px #00ff41aa);
+  }
+
+  .ring-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .timer-display {
+    font-size: 28px;
+    color: #00ff41;
+    letter-spacing: 2px;
+    line-height: 1;
+    text-shadow: 0 0 8px #00ff4166;
+  }
+
+  .timer-mode {
+    font-size: 9px;
+    color: #2a5a2a;
+    letter-spacing: 3px;
+    margin-top: 3px;
+    text-transform: uppercase;
+  }
+
+  /* controls row */
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 8px;
+  }
+
+  .ctrl-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s;
+  }
+  .ctrl-btn:hover { opacity: 0.7; }
+  .ctrl-btn svg { width: 18px; height: 18px; }
+
+  /* sessions bar */
+  .sessions-bar {
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .sessions-label {
+    font-size: 9px;
+    color: #1a3a1a;
+    letter-spacing: 2px;
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .sessions-dots {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border: 1px solid #1a3a1a;
+    border-radius: 50%;
+    transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+  }
+  .dot.done {
+    background: #00ff41;
+    border-color: #00ff41;
+    box-shadow: 0 0 4px #00ff4188;
+  }
+  .dot.active-dot {
+    border-color: #00ff41;
+    animation: pulse-dot 1s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* settings btn */
+  .gear-btn {
+    position: absolute;
+    bottom: 10px;
+    left: 12px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    opacity: 0.4;
+    transition: opacity 0.2s;
+    z-index: 20;
+  }
+  .gear-btn:hover { opacity: 1; }
+  .gear-btn svg { width: 14px; height: 14px; }
+
+  /* ---- SETTINGS PANEL ---- */
+  .settings-panel {
+    position: absolute;
+    inset: 0;
+    background: #0a0d0a;
+    border-radius: 12px;
+    display: none;
+    flex-direction: column;
+    padding: 18px 16px;
+    z-index: 30;
+    gap: 14px;
+  }
+
+  .settings-title {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #00ff41;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin-bottom: 2px;
+  }
+
+  .setting-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .setting-label {
+    font-size: 9px;
+    color: #2a5a2a;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .setting-input {
+    background: #0d150d;
+    border: 1px solid #1a3a1a;
+    color: #00ff41;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    padding: 4px 8px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .setting-input:focus { border-color: #00ff41; }
+
+  .meta-display {
+    font-size: 11px;
+    color: #2a5a2a;
+    letter-spacing: 1px;
+    padding: 4px 8px;
+    border: 1px solid #1a3a1a;
+    background: #0d150d;
+  }
+
+  .settings-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: auto;
+  }
+
+  .s-btn {
+    flex: 1;
+    background: transparent;
+    border: 1px solid #1a3a1a;
+    color: #2a5a2a;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    padding: 6px 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .s-btn:hover { border-color: #00ff41; color: #00ff41; }
+  .s-btn.danger:hover { border-color: #ff4141; color: #ff4141; }
+  .s-btn.save { border-color: #00ff41; color: #00ff41; }
+  .s-btn.save:hover { background: #00ff41; color: #000; }
+
+  /* break overlay */
+  .break-banner {
+    position: absolute;
+    inset: 0;
+    background: #0a0d0a;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    z-index: 25;
+    border-radius: 12px;
+  }
+
+  .break-text {
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: #00cc33;
+    text-transform: uppercase;
+    animation: flicker 3s infinite;
+  }
+
+  .break-time {
+    font-size: 32px;
+    color: #00ff41;
+    text-shadow: 0 0 10px #00ff41aa;
+  }
+
+  .skip-btn {
+    background: transparent;
+    border: 1px solid #1a3a1a;
+    color: #2a5a2a;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    padding: 5px 12px;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .skip-btn:hover { border-color: #00ff41; color: #00ff41; }
+
+  @keyframes flicker {
+    0%, 96%, 100% { opacity: 0.7; }
+    97% { opacity: 0.2; }
+    98% { opacity: 0.9; }
+    99% { opacity: 0.3; }
+  }
+
+  /* matrix rain on idle */
+  .matrix-rain {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.4;
+  }
+  .rain-col {
+    position: absolute;
+    top: -100%;
+    font-size: 9px;
+    color: #00ff41;
+    display: flex;
+    flex-direction: column;
+    animation: fall linear infinite;
+    opacity: 0;
+  }
+  @keyframes fall {
+    0% { transform: translateY(0); opacity: 0; }
+    5% { opacity: 1; }
+    90% { opacity: 0.6; }
+    100% { transform: translateY(400px); opacity: 0; }
+  }
+
+  .hidden { display: none !important; }
+  .fade-in { animation: fadeIn 0.4s ease forwards; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: scale(1); }
+  }
 </style>
 </head>
-
 <body>
+<div class="card" id="card">
+  <!-- corners -->
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
 
-<div class="container">
+  <!-- matrix rain bg -->
+  <div class="matrix-rain" id="matrixRain"></div>
 
-<h1>Pomodoro</h1>
+  <!-- IDLE VIEW -->
+  <div class="idle-view" id="idleView">
+    <span class="module-tag">// foco</span>
+    <span class="idle-title">Pomodoro</span>
+    <p class="idle-desc">ciclos de trabalho e pausa para maximizar produtividade e concentração</p>
+    <button class="start-btn" onclick="startSession()">iniciar</button>
+  </div>
 
-<div id="timer">25:00</div>
+  <!-- ACTIVE VIEW -->
+  <div class="active-view" id="activeView">
+    <div class="ring-wrap">
+      <svg class="ring-svg" viewBox="0 0 130 130">
+        <circle class="ring-track" cx="65" cy="65" r="55"/>
+        <circle class="ring-progress" id="ringProgress" cx="65" cy="65" r="55"/>
+      </svg>
+      <div class="ring-center">
+        <span class="timer-display" id="timerDisplay">25:00</span>
+        <span class="timer-mode" id="timerMode">focus</span>
+      </div>
+    </div>
 
-<button onclick="startTimer()">Start</button>
-<button onclick="pauseTimer()">Pause</button>
-<button onclick="resetTimer()">Reset</button>
+    <div class="controls">
+      <button class="ctrl-btn" onclick="toggleTimer()" id="playPauseBtn" title="play/pause">
+        <svg id="playIcon" viewBox="0 0 24 24" fill="none" stroke="#00ff41" stroke-width="1.5">
+          <polygon points="5,3 19,12 5,21" fill="#00ff41" stroke="none"/>
+        </svg>
+        <svg id="pauseIcon" viewBox="0 0 24 24" fill="none" stroke="#00ff41" stroke-width="1.5" style="display:none">
+          <rect x="6" y="4" width="4" height="16" fill="#00ff41"/>
+          <rect x="14" y="4" width="4" height="16" fill="#00ff41"/>
+        </svg>
+      </button>
+    </div>
 
-<br><br>
+    <div class="sessions-bar">
+      <div class="sessions-label">
+        <span>sessões</span>
+        <span id="sessionsCount">0 / <span id="goalDisplay">4</span></span>
+      </div>
+      <div class="sessions-dots" id="sessionsDots"></div>
+    </div>
+  </div>
 
-Trabalho: <input id="work" type="number" value="25" style="width: 50px;"> min
-<button onclick="applySettings()">Aplicar</button>
+  <!-- BREAK BANNER -->
+  <div class="break-banner" id="breakBanner">
+    <span class="break-text">pausa</span>
+    <span class="break-time" id="breakDisplay">05:00</span>
+    <button class="skip-btn" onclick="skipBreak()">pular →</button>
+  </div>
 
-<br><br>
+  <!-- SETTINGS PANEL -->
+  <div class="settings-panel" id="settingsPanel">
+    <span class="settings-title">config</span>
 
-<select id="musicSelect">
-  <option value="">Sem música</option>
+    <div class="setting-row">
+      <span class="setting-label">trabalho (min)</span>
+      <input class="setting-input" type="number" id="workInput" min="1" max="90" value="25">
+    </div>
 
-  <optgroup label="Lofi">
-    <option value="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3">Lofi 1</option>
-    <option value="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3">Lofi 2</option>
-    <option value="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3">Lofi 3</option>
-  </optgroup>
+    <div class="setting-row">
+      <span class="setting-label">pausa (min)</span>
+      <input class="setting-input" type="number" id="breakInput" min="1" max="30" value="5">
+    </div>
 
-  <optgroup label="Ambiente">
-    <option value="https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg">Chuva</option>
-    <option value="https://actions.google.com/sounds/v1/water/waves_crashing_on_rock_beach.ogg">Ondas do mar</option>
-    <option value="https://actions.google.com/sounds/v1/nature/jungle_atmosphere_late_night.ogg">Floresta</option>
-    <option value="https://actions.google.com/sounds/v1/water/babbling_brook.ogg">Rio</option>
-    <option value="https://actions.google.com/sounds/v1/household/crackling_fireplace.ogg">Lareira</option>
-  </optgroup>
+    <div class="setting-row">
+      <span class="setting-label">meta (sessões)</span>
+      <input class="setting-input" type="number" id="goalInput" min="1" max="12" value="4">
+    </div>
 
-  <optgroup label="Música Clássica">
-    <option value="https://upload.wikimedia.org/wikipedia/commons/b/bd/Vivaldi_-_Spring_mvt_1_Allegro_-_John_Harrison_violin.ogg">Vivaldi - Primavera</option>
-    <option value="https://upload.wikimedia.org/wikipedia/commons/e/e4/Beethoven_Moonlight_1st_movement.ogg">Beethoven - Moonlight Sonata</option>
-    <option value="https://upload.wikimedia.org/wikipedia/commons/e/e5/Mozart_-_Eine_kleine_Nachtmusik_-_1._Allegro.ogg">Mozart - Eine kleine Nachtmusik</option>
-    <option value="https://upload.wikimedia.org/wikipedia/commons/e/e4/Chopin_Nocturne_Op_9_No_2_E_Flat_Major.ogg">Chopin - Noturno Op. 9 No. 2</option>
-  </optgroup>
-</select>
+    <div class="setting-row">
+      <span class="setting-label">progresso</span>
+      <div class="meta-display" id="progressDisplay">0 sessões concluídas</div>
+    </div>
 
-<br><br>
+    <div class="settings-actions">
+      <button class="s-btn danger" onclick="resetAll()">reset</button>
+      <button class="s-btn save" onclick="saveSettings()">salvar</button>
+    </div>
+  </div>
 
-<button onclick="playMusic()">Play</button>
-<button onclick="stopMusic()">Parar</button>
-
-<br><br>
-
-Volume:
-<input type="range" min="0" max="1" step="0.01" value="0.3" id="volumeSlider" onchange="changeVolume()">
-
-<button onclick="toggleMute()" id="muteBtn">Mute</button>
-
+  <!-- GEAR BTN (always visible except on idle) -->
+  <button class="gear-btn" id="gearBtn" onclick="toggleSettings()" style="display:none">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#00ff41" stroke-width="1.5">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </button>
 </div>
 
-<audio id="music" loop></audio>
-<audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg"></audio>
-
 <script>
-let timer;
-let timeLeft = 1500;
-let running = false;
-let muted = false;
+  // --- STATE ---
+  let workMinutes = 25;
+  let breakMinutes = 5;
+  let goalSessions = 4;
+  let completedSessions = 0;
 
-// TIMER
-function updateDisplay() {
-  let min = Math.floor(timeLeft / 60);
-  let sec = timeLeft % 60;
-  document.getElementById("timer").innerText =
-    String(min).padStart(2,'0') + ":" + String(sec).padStart(2,'0');
-}
+  let totalSeconds = workMinutes * 60;
+  let remainingSeconds = totalSeconds;
+  let isRunning = false;
+  let interval = null;
+  let isBreak = false;
+  let settingsOpen = false;
 
-function startTimer() {
-  if (running) return;
-  running = true;
+  const CIRCUMFERENCE = 2 * Math.PI * 55;
 
-  timer = setInterval(() => {
-    timeLeft--;
-
-    if (timeLeft <= 0) {
-      clearInterval(timer);
-      running = false;
-      updateDisplay();
-
-      // Para a música ambiente para o alarme se destacar
-      stopMusic();
-
-      // Dispara o alarme no volume máximo (1.0)
-      let alarm = document.getElementById("alarm");
-      alarm.volume = 1.0; 
-      alarm.currentTime = 0;
-      alarm.play().catch((err) => {
-        console.log("Erro ao tocar alarme:", err);
-      });
-      
-      // Corta o alarme após ~2.5 segundos (tempo exato para 3 apitos)
-      setTimeout(() => {
-        alarm.pause();
-        alarm.currentTime = 0;
-      }, 2500);
-
-      return; 
+  // --- MATRIX RAIN ---
+  const chars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノ';
+  const rainEl = document.getElementById('matrixRain');
+  for (let i = 0; i < 10; i++) {
+    const col = document.createElement('div');
+    col.className = 'rain-col';
+    col.style.left = (i * 10 + Math.random() * 5) + '%';
+    col.style.animationDuration = (3 + Math.random() * 4) + 's';
+    col.style.animationDelay = (Math.random() * 5) + 's';
+    let text = '';
+    for (let j = 0; j < 20; j++) {
+      text += chars[Math.floor(Math.random() * chars.length)] + '<br>';
     }
-
-    updateDisplay();
-  }, 1000);
-}
-
-function pauseTimer() {
-  clearInterval(timer);
-  running = false;
-}
-
-function resetTimer() {
-  clearInterval(timer);
-  running = false;
-  timeLeft = document.getElementById("work").value * 60;
-  updateDisplay();
-}
-
-function applySettings() {
-  timeLeft = document.getElementById("work").value * 60;
-  updateDisplay();
-}
-
-// MUSICA
-function playMusic() {
-  let music = document.getElementById("music");
-  let selected = document.getElementById("musicSelect").value;
-
-  music.pause();
-  music.currentTime = 0;
-
-  if (!selected) return;
-
-  music.src = selected;
-  
-  // Sincroniza o volume antes de tocar
-  changeVolume();
-
-  music.play().catch(err => {
-    console.log("Erro ao tocar:", err);
-    alert("Não foi possível carregar a música. Tente outra faixa.");
-  });
-}
-
-function stopMusic() {
-  let music = document.getElementById("music");
-  music.pause();
-  music.currentTime = 0;
-}
-
-function changeVolume() {
-  let music = document.getElementById("music");
-  music.volume = document.getElementById("volumeSlider").value;
-}
-
-function toggleMute() {
-  let music = document.getElementById("music");
-  let muteBtn = document.getElementById("muteBtn");
-  muted = !muted;
-  music.muted = muted;
-  
-  if(muted) {
-      muteBtn.style.backgroundColor = "#ef4444"; // Fica vermelho se mutado
-      muteBtn.innerText = "Unmute";
-  } else {
-      muteBtn.style.backgroundColor = "#3b82f6"; // Volta pro azul original
-      muteBtn.innerText = "Mute";
+    col.innerHTML = text;
+    rainEl.appendChild(col);
   }
-}
 
-updateDisplay();
+  // --- RING ---
+  function updateRing(fraction) {
+    const prog = document.getElementById('ringProgress');
+    prog.style.strokeDasharray = CIRCUMFERENCE;
+    prog.style.strokeDashoffset = CIRCUMFERENCE * (1 - fraction);
+    // color shift: green -> amber as time runs low
+    if (fraction < 0.25) {
+      prog.style.stroke = '#ffaa00';
+      prog.style.filter = 'drop-shadow(0 0 4px #ffaa00aa)';
+    } else {
+      prog.style.stroke = '#00ff41';
+      prog.style.filter = 'drop-shadow(0 0 4px #00ff41aa)';
+    }
+  }
+
+  // --- DOTS ---
+  function renderDots() {
+    const container = document.getElementById('sessionsDots');
+    container.innerHTML = '';
+    document.getElementById('sessionsCount').innerHTML =
+      completedSessions + ' / <span id="goalDisplay">' + goalSessions + '</span>';
+    for (let i = 0; i < goalSessions; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'dot';
+      if (i < completedSessions) dot.classList.add('done');
+      else if (i === completedSessions && isRunning && !isBreak) dot.classList.add('active-dot');
+      container.appendChild(dot);
+    }
+  }
+
+  // --- FORMAT ---
+  function fmt(s) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+  }
+
+  // --- TIMER TICK ---
+  function tick() {
+    if (remainingSeconds <= 0) {
+      clearInterval(interval);
+      isRunning = false;
+      if (!isBreak) {
+        completedSessions = Math.min(completedSessions + 1, goalSessions);
+        renderDots();
+        startBreak();
+      } else {
+        endBreak();
+      }
+      return;
+    }
+    remainingSeconds--;
+    if (!isBreak) {
+      document.getElementById('timerDisplay').textContent = fmt(remainingSeconds);
+      updateRing(remainingSeconds / totalSeconds);
+    } else {
+      document.getElementById('breakDisplay').textContent = fmt(remainingSeconds);
+    }
+  }
+
+  // --- START SESSION ---
+  function startSession() {
+    document.getElementById('idleView').style.display = 'none';
+    document.getElementById('matrixRain').style.display = 'none';
+    const av = document.getElementById('activeView');
+    av.style.display = 'flex';
+    av.classList.add('fade-in');
+    document.getElementById('gearBtn').style.display = 'block';
+
+    totalSeconds = workMinutes * 60;
+    remainingSeconds = totalSeconds;
+    isBreak = false;
+    document.getElementById('timerDisplay').textContent = fmt(remainingSeconds);
+    document.getElementById('timerMode').textContent = 'focus';
+    updateRing(1);
+    renderDots();
+  }
+
+  // --- TOGGLE PLAY/PAUSE ---
+  function toggleTimer() {
+    if (isRunning) {
+      clearInterval(interval);
+      isRunning = false;
+      document.getElementById('playIcon').style.display = 'block';
+      document.getElementById('pauseIcon').style.display = 'none';
+      renderDots();
+    } else {
+      isRunning = true;
+      interval = setInterval(tick, 1000);
+      document.getElementById('playIcon').style.display = 'none';
+      document.getElementById('pauseIcon').style.display = 'block';
+      renderDots();
+    }
+  }
+
+  // --- BREAK ---
+  function startBreak() {
+    isBreak = true;
+    remainingSeconds = breakMinutes * 60;
+    const banner = document.getElementById('breakBanner');
+    banner.style.display = 'flex';
+    banner.classList.add('fade-in');
+    document.getElementById('breakDisplay').textContent = fmt(remainingSeconds);
+    document.getElementById('playIcon').style.display = 'block';
+    document.getElementById('pauseIcon').style.display = 'none';
+    interval = setInterval(tick, 1000);
+    isRunning = true;
+  }
+
+  function skipBreak() {
+    clearInterval(interval);
+    isRunning = false;
+    endBreak();
+  }
+
+  function endBreak() {
+    isBreak = false;
+    document.getElementById('breakBanner').style.display = 'none';
+    totalSeconds = workMinutes * 60;
+    remainingSeconds = totalSeconds;
+    document.getElementById('timerDisplay').textContent = fmt(remainingSeconds);
+    document.getElementById('timerMode').textContent = 'focus';
+    updateRing(1);
+    document.getElementById('playIcon').style.display = 'block';
+    document.getElementById('pauseIcon').style.display = 'none';
+    renderDots();
+    if (completedSessions >= goalSessions) {
+      showGoalReached();
+    }
+  }
+
+  function showGoalReached() {
+    document.getElementById('timerMode').textContent = 'meta atingida';
+  }
+
+  // --- SETTINGS ---
+  function toggleSettings() {
+    settingsOpen = !settingsOpen;
+    const panel = document.getElementById('settingsPanel');
+    if (settingsOpen) {
+      document.getElementById('workInput').value = workMinutes;
+      document.getElementById('breakInput').value = breakMinutes;
+      document.getElementById('goalInput').value = goalSessions;
+      document.getElementById('progressDisplay').textContent =
+        completedSessions + ' sessões concluídas';
+      panel.style.display = 'flex';
+      panel.classList.add('fade-in');
+    } else {
+      panel.style.display = 'none';
+    }
+  }
+
+  function saveSettings() {
+    workMinutes = Math.max(1, parseInt(document.getElementById('workInput').value) || 25);
+    breakMinutes = Math.max(1, parseInt(document.getElementById('breakInput').value) || 5);
+    goalSessions = Math.max(1, parseInt(document.getElementById('goalInput').value) || 4);
+
+    if (!isRunning) {
+      totalSeconds = workMinutes * 60;
+      remainingSeconds = totalSeconds;
+      document.getElementById('timerDisplay').textContent = fmt(remainingSeconds);
+      updateRing(1);
+    }
+    renderDots();
+    toggleSettings();
+  }
+
+  function resetAll() {
+    clearInterval(interval);
+    isRunning = false;
+    isBreak = false;
+    completedSessions = 0;
+    totalSeconds = workMinutes * 60;
+    remainingSeconds = totalSeconds;
+
+    document.getElementById('breakBanner').style.display = 'none';
+    document.getElementById('settingsPanel').style.display = 'none';
+    settingsOpen = false;
+
+    document.getElementById('timerDisplay').textContent = fmt(remainingSeconds);
+    document.getElementById('timerMode').textContent = 'focus';
+    document.getElementById('playIcon').style.display = 'block';
+    document.getElementById('pauseIcon').style.display = 'none';
+    updateRing(1);
+    renderDots();
+  }
+
+  // init ring
+  document.getElementById('ringProgress').style.strokeDasharray = CIRCUMFERENCE;
+  document.getElementById('ringProgress').style.strokeDashoffset = 0;
 </script>
-
 </body>
 </html>
